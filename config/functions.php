@@ -1,5 +1,13 @@
 <?php
-require 'vendor/autoload.php';
+
+if (file_exists('vendor/autoload.php')) {
+    require 'vendor/autoload.php';
+} elseif (file_exists('../vendor/autoload.php')) {
+    require '../vendor/autoload.php';
+}
+
+// Check if PHPMailer classes exist
+$phpmailer_available = class_exists('PHPMailer\PHPMailer\PHPMailer');
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -118,12 +126,12 @@ function sendMFACode($email, $code) {
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'jnavarez20@gmail.com'; // Replace with your Gmail address
-        $mail->Password   = ''; // Replace with your app password
+        $mail->Password   = 'nqgw obkv lnyl cryd'; // Replace with your app password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
         // Recipients
-        $mail->setFrom('jnavarez20@gmail.com', 'CBS MFA');
+        $mail->setFrom('jnavarez20@gmail.com', 'CBS TESTING MFA');
         $mail->addAddress($email);
 
         // Content
@@ -140,3 +148,25 @@ function sendMFACode($email, $code) {
     }
 }
 
+/**
+ * Log user login attempts
+ * 
+ * @param int|null $user_id User ID (null for failed logins)
+ * @param string $username Username used for login attempt
+ * @param string $status 'success' or 'failed'
+ * @return bool Whether the log was successfully created
+ */
+function logLoginAttempt($user_id, $username, $status) {
+    global $db;
+    
+    $query = "INSERT INTO audit_logs (user_id, username, action, status, ip_address) 
+              VALUES (:user_id, :username, 'login', :status, :ip_address)";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(':user_id', $user_id);
+    $stmt->bindParam(':username', $username);
+    $stmt->bindParam(':status', $status);
+    $stmt->bindParam(':ip_address', $_SERVER['REMOTE_ADDR']);
+    
+    return $stmt->execute();
+}

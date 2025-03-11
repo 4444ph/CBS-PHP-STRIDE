@@ -36,22 +36,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->rowCount() > 0) {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+        
             if ($user['is_suspended']) {
                 $errors[] = "Your account has been suspended. Please contact the administrator.";
+                // Log failed login attempt due to suspension
+                logLoginAttempt($user['id'], $username, 'failed');
             } elseif (password_verify($password, $user['password'])) {
                 if ($user['mfa_enabled']) {
                     // Generate and store MFA code
                     $mfa_code = generateMFACode();
                     $mfa_code_expiry = date('Y-m-d H:i:s', strtotime('+5 minutes'));
-                    
+                
                     $update_query = "UPDATE users SET mfa_code = :mfa_code, mfa_code_expiry = :mfa_code_expiry WHERE id = :id";
                     $update_stmt = $db->prepare($update_query);
                     $update_stmt->bindParam(':mfa_code', $mfa_code);
                     $update_stmt->bindParam(':mfa_code_expiry', $mfa_code_expiry);
                     $update_stmt->bindParam(':id', $user['id']);
                     $update_stmt->execute();
-                    
+                
                     // Send MFA code via email
                     if (sendMFACode($user['email'], $mfa_code)) {
                         // Redirect to MFA verification page
@@ -60,21 +62,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         exit();
                     } else {
                         $errors[] = "Failed to send MFA code. Please try again.";
+                        // Log failed login attempt due to MFA issue
+                        logLoginAttempt($user['id'], $username, 'failed');
                     }
                 } else {
                     // Log in the user
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['username'] = $user['username'];
                     $_SESSION['is_admin'] = $user['is_admin'];
-                    
+                
+                    // Log successful login
+                    logLoginAttempt($user['id'], $username, 'success');
+                
                     header("Location: index.php");
                     exit();
                 }
             } else {
                 $errors[] = "Invalid username or password";
+                // Log failed login attempt due to wrong password
+                logLoginAttempt($user['id'], $username, 'failed');
             }
         } else {
             $errors[] = "Invalid username or password";
+            // Log failed login attempt for non-existent user
+            logLoginAttempt(null, $username, 'failed');
         }
     }
 }

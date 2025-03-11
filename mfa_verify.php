@@ -34,6 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['is_admin'] = $user['is_admin'];
                 
+                // Log successful login with MFA
+                logLoginAttempt($user['id'], $user['username'], 'success');
+                
                 // Clear MFA session and code
                 unset($_SESSION['mfa_user_id']);
                 $clear_query = "UPDATE users SET mfa_code = NULL, mfa_code_expiry = NULL WHERE id = :id";
@@ -45,6 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit();
             } else {
                 $errors[] = "Invalid or expired verification code";
+                // Log failed MFA verification
+                logLoginAttempt($_SESSION['mfa_user_id'], $user['username'], 'failed');
             }
         } else {
             $errors[] = "User not found";
